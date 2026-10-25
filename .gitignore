@@ -1,0 +1,11 @@
+# Build output
+monkeydb
+*.o
+*.out
+
+# Database files (generated at runtime)
+*/**.jsonl
+
+# OS
+.DS_Store
+Thumbs.db
