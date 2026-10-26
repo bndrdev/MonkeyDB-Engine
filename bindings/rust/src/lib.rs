@@ -56,3 +56,27 @@ impl Collection {
     }
 }
 impl Drop for Collection { fn drop(&mut self) { unsafe { monkeydb_collection_close(self.handle.as_ptr()); } } }
+
+#[cfg(test)]
+mod tests {
+    use super::Collection;
+    use serde_json::json;
+
+    #[test]
+    fn collection_crud_and_nested_json() {
+        let path = std::env::temp_dir().join(format!("monkeydb-rust-{}.jsonl", std::process::id()));
+        let id;
+        {
+            let collection = Collection::open(path.to_str().unwrap()).unwrap();
+            id = collection.insert(&json!({"name":"Ada", "profile":{"tags":["rust"]}})).unwrap();
+            let found = collection.find_by_id(&id).unwrap().unwrap();
+            assert_eq!(found["profile"]["tags"][0], "rust");
+            assert!(collection.find_by_id("missing").unwrap().is_none());
+            assert_eq!(collection.count().unwrap(), 1);
+            assert!(collection.delete_by_id(&id).unwrap());
+            assert_eq!(collection.count().unwrap(), 0);
+        }
+        let _ = std::fs::remove_file(&path);
+        let _ = std::fs::remove_file(format!("{}.lock", path.display()));
+    }
+}

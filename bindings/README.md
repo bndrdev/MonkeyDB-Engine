@@ -45,13 +45,13 @@ const user = users.findById(id);
 users.close();
 ```
 
-Build checks, run from the repository root:
+Build and run the binding checks from the repository root:
 
 ```sh
-python3 -m py_compile bindings/python/monkeydb.py
-MONKEYDB_LIBRARY="$PWD/build/libmonkeydb.so" node -e "require('./bindings/node')"
+PYTHONPATH=bindings/python MONKEYDB_LIBRARY="$PWD/build/libmonkeydb.so" python3 -m unittest discover -s bindings/python
+MONKEYDB_LIBRARY="$PWD/build/libmonkeydb.so" npm test --prefix bindings/node
 LD_LIBRARY_PATH="$PWD/build" go test ./bindings/go
 MONKEYDB_LIB_DIR="$PWD/build" LD_LIBRARY_PATH="$PWD/build" cargo test --manifest-path bindings/rust/Cargo.toml
-LD_LIBRARY_PATH="$PWD/build" mvn -f bindings/java/pom.xml package
-LD_LIBRARY_PATH="$PWD/build" dotnet build bindings/csharp/MonkeyDB.csproj
+MONKEYDB_LIBRARY="$PWD/build/libmonkeydb.so" LD_LIBRARY_PATH="$PWD/build" mvn -f bindings/java/pom.xml package
+LD_LIBRARY_PATH="$PWD/build" dotnet run --project bindings/csharp-smoke/Smoke.csproj
 ```

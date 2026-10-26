@@ -4,6 +4,9 @@
   "description": "Node.js binding for the MonkeyDB C ABI",
   "main": "index.js",
   "type": "commonjs",
+  "scripts": {
+    "test": "node --test"
+  },
   "dependencies": {
     "koffi": "^2.12.0"
   }
