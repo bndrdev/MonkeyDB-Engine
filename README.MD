@@ -1,7 +1,8 @@
 # MonkeyDB
 
-A lightweight, embedded NoSQL document database written in **C++17**.  
-No external dependencies. No server. Just pure C++.
+A lightweight, embedded JSONL document database written in **C++17**.
+
+The C++ core and C ABI require no third-party libraries. The implementation uses POSIX file APIs, so it currently targets Linux and other POSIX systems. Optional language bindings have separate requirements; see [the bindings guide](bindings/README.md).
 
 ---
 
@@ -11,8 +12,11 @@ No external dependencies. No server. Just pure C++.
 - **Persistent storage** — data saved to `.jsonl` files on disk
 - **Lambda-based filtering** — flexible queries using C++ lambdas
 - **Auto-generated IDs** — every document gets a unique `_id` automatically
-- **Thread-safe** — mutex + file locking for concurrent access
-- **Zero dependencies** — pure C++17 standard library only
+- **Indexed ID lookup** — in-memory `_id` to byte-offset index
+- **Nested JSON values** — documents and arrays can contain nested values
+- **Crash-safer mutations** — synced temporary file and atomic replacement
+- **C ABI** — JSON interface for foreign-function bindings
+- **No third-party dependencies in the core** — uses C++17 and POSIX APIs
 
 ---
 
@@ -24,6 +28,9 @@ MonkeyDB/
 ├── MonkeyDB.cpp
 ├── MonkeyCollection.hpp  # Collection class — all CRUD operations
 ├── MonkeyCollection.cpp
+├── MonkeyDB_C.h          # C ABI for language bindings
+├── MonkeyDB_C.cpp
+├── bindings/             # Python, Node.js, Go, Rust, Java and C# bindings
 └── main.cpp              # Usage example
 ```
 
@@ -32,9 +39,17 @@ MonkeyDB/
 ## Build
 
 ```bash
-g++ -std=c++17 -o myapp main.cpp MonkeyDB.cpp MonkeyCollection.cpp
+g++ -std=c++17 -pthread -o myapp main.cpp MonkeyDB.cpp MonkeyCollection.cpp
 ./myapp
 ```
+
+Build the C ABI shared library on Linux:
+```bash
+mkdir -p build
+g++ -std=c++17 -pthread -fPIC -shared -o build/libmonkeydb.so MonkeyCollection.cpp MonkeyDB_C.cpp
+```
+
+The C++ API uses no third-party libraries. Binding requirements vary: Python uses `ctypes`; Node.js uses Koffi; Go uses cgo and a C toolchain; Rust uses `serde` and `serde_json`; Java uses JNA and Gson; C# uses .NET P/Invoke. Setup instructions are in [`bindings/README.md`](bindings/README.md).
 
 ---
 
@@ -81,7 +96,7 @@ int main() {
 | Method | Description |
 |--------|-------------|
 | `MonkeyDB(name)` | Creates or opens a database directory |
-| `getCollection(name)` | Returns a collection (creates file if needed) |
+| `getCollection(name)` | Returns a collection; the data file is created on first insert |
 
 ---
 
@@ -162,6 +177,8 @@ int total = col.count();
 | `double` | `{"score", 9.5}` |
 | `bool` | `{"active", true}` |
 | `nullptr_t` | `{"deleted", nullptr}` |
+| `std::shared_ptr<MonkeyObject>` | nested object |
+| `std::shared_ptr<MonkeyArray>` | array of values, including nested values |
 
 ---
 
@@ -183,10 +200,11 @@ myapp_data/
 
 ## Limitations
 
-- No nested objects or arrays
-- Full file scan on every query (no indexing)
-- Not recommended for large datasets (10k+ documents)
-- Designed for single-machine use only
+- ID lookups use an in-memory index; filter-based queries still scan the collection.
+- Mutations rewrite the collection through a temporary file, which favors safer replacement over write throughput on large files.
+- The ID index is rebuilt in memory when the collection file changes; it is not stored on disk.
+- Uses POSIX file APIs; Windows is not currently supported.
+- Intended for single-machine, small-to-medium workloads rather than distributed or high-write-throughput systems.
 
 ---
 
