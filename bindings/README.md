@@ -50,7 +50,7 @@ Build and run the binding checks from the repository root:
 ```sh
 PYTHONPATH=bindings/python MONKEYDB_LIBRARY="$PWD/build/libmonkeydb.so" python3 -m unittest discover -s bindings/python
 MONKEYDB_LIBRARY="$PWD/build/libmonkeydb.so" npm test --prefix bindings/node
-LD_LIBRARY_PATH="$PWD/build" go test ./bindings/go
+(cd bindings/go && LD_LIBRARY_PATH="$PWD/../../build" go test ./...)
 MONKEYDB_LIB_DIR="$PWD/build" LD_LIBRARY_PATH="$PWD/build" cargo test --manifest-path bindings/rust/Cargo.toml
 MONKEYDB_LIBRARY="$PWD/build/libmonkeydb.so" LD_LIBRARY_PATH="$PWD/build" mvn -f bindings/java/pom.xml package
 LD_LIBRARY_PATH="$PWD/build" dotnet run --project bindings/csharp-smoke/Smoke.csproj
