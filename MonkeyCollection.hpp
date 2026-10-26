@@ -8,16 +8,27 @@
 #include <unordered_map>
 #include <variant>
 #include <mutex>
+#include <memory>
+#include <cstdint>
 
-// Simple JSON value type
-using MonkeyValue = std::variant<std::string, int, double, bool, std::nullptr_t>;
-using MonkeyDoc   = std::unordered_map<std::string, MonkeyValue>;
+struct MonkeyArray;
+struct MonkeyObject;
+using MonkeyValue = std::variant<std::string, int, double, bool, std::nullptr_t,
+                                 std::shared_ptr<MonkeyArray>, std::shared_ptr<MonkeyObject>>;
+struct MonkeyArray : std::vector<MonkeyValue> { using std::vector<MonkeyValue>::vector; };
+struct MonkeyObject : std::unordered_map<std::string, MonkeyValue> {
+    using std::unordered_map<std::string, MonkeyValue>::unordered_map;
+};
+using MonkeyDoc = MonkeyObject;
 
 class MonkeyCollection {
 private:
     std::string filePath;
     std::string lockPath;
     mutable std::mutex mtx;
+    mutable std::unordered_map<std::string, std::uint64_t> idIndex;
+    mutable std::uintmax_t indexedSize = static_cast<std::uintmax_t>(-1);
+    mutable std::int64_t indexedMtime = -1;
 
     // Serialization
     std::string serializeDoc(const MonkeyDoc& doc) const;
@@ -28,6 +39,7 @@ private:
     // File I/O
     std::vector<MonkeyDoc> readAll() const;
     void writeAll(const std::vector<MonkeyDoc>& docs) const;
+    void refreshIndex() const;
 
     // File locking (cross-process)
     int  acquireLock() const;
@@ -38,6 +50,8 @@ private:
 
 public:
     explicit MonkeyCollection(const std::string& path);
+    std::string insertJson(const std::string& json);
+    std::optional<std::string> findByIdJson(const std::string& id) const;
 
     // Insert — auto-assigns "_id" if not provided; returns the assigned id
     std::string insert(MonkeyDoc doc);

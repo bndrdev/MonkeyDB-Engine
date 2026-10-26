@@ -11,8 +11,11 @@ No external dependencies. No server. Just pure C++.
 - **Persistent storage** — data saved to `.jsonl` files on disk
 - **Lambda-based filtering** — flexible queries using C++ lambdas
 - **Auto-generated IDs** — every document gets a unique `_id` automatically
-- **Thread-safe** — mutex + file locking for concurrent access
-- **Zero dependencies** — pure C++17 standard library only
+- **Thread-safe** — mutex + POSIX file locking for concurrent access
+- **Indexed ID lookup** — lazy in-memory `_id` → byte-offset index, refreshed when the file changes
+- **Nested values** — documents and arrays can contain other documents, arrays, and scalar values
+- **Crash-safer mutations** — writes use a synced temporary file and atomic rename
+- **C ABI** — JSON-based functions for bindings to other languages
 
 ---
 
@@ -34,6 +37,13 @@ MonkeyDB/
 ```bash
 g++ -std=c++17 -o myapp main.cpp MonkeyDB.cpp MonkeyCollection.cpp
 ./myapp
+```
+
+Build the C ABI as a shared library and run regression tests:
+```bash
+g++ -std=c++17 -fPIC -shared -o libmonkeydb.so MonkeyCollection.cpp MonkeyDB_C.cpp
+g++ -std=c++17 -I. -o test_monkeydb tests/test_monkeydb.cpp MonkeyCollection.cpp MonkeyDB_C.cpp
+./test_monkeydb
 ```
 
 ---
@@ -162,6 +172,26 @@ int total = col.count();
 | `double` | `{"score", 9.5}` |
 | `bool` | `{"active", true}` |
 | `nullptr_t` | `{"deleted", nullptr}` |
+| `std::shared_ptr<MonkeyObject>` | nested object |
+| `std::shared_ptr<MonkeyArray>` | array of values, including nested values |
+
+---
+
+Nested objects and arrays are constructed with shared pointers:
+```cpp
+auto profile = std::make_shared<MonkeyObject>();
+(*profile)["city"] = std::string("Cairo");
+auto tags = std::make_shared<MonkeyArray>();
+tags->push_back(std::string("cpp"));
+MonkeyDoc doc{{"profile", profile}, {"tags", tags}};
+auto id = users.insert(doc);
+```
+
+`_id` must be a string and duplicate IDs are rejected. Filter queries still scan the collection; `findById` uses the in-memory offset index. Mutations rewrite the file through an fsynced temporary file and atomic rename, favoring crash safety over write throughput.
+
+## C interface
+
+Include `MonkeyDB_C.h` for collection open/close, JSON insert, find-by-ID, delete-by-ID and count. Returned strings must be freed with `monkeydb_free`. Errors return `NULL` or `-1`; `monkeydb_last_error()` provides the error text.
 
 ---
 
@@ -183,9 +213,9 @@ myapp_data/
 
 ## Limitations
 
-- No nested objects or arrays
-- Full file scan on every query (no indexing)
-- Not recommended for large datasets (10k+ documents)
+- The `_id` index is in memory and rebuilt when opening or detecting collection-file changes; it is not persisted.
+- Filter queries scan the full file; mutations currently rewrite the collection, which is expensive for large datasets.
+- Uses POSIX locking and filesystem calls, so Windows portability is not currently provided.
 - Designed for single-machine use only
 
 ---
