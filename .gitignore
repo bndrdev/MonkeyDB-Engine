@@ -2,9 +2,18 @@
 monkeydb
 *.o
 *.out
+build/
+node_modules/
+**/target/
+**/bin/
+**/obj/
+__pycache__/
+*.py[cod]
 
 # Database files (generated at runtime)
 */**.jsonl
+*.jsonl.lock
+*.jsonl.tmp.*
 
 # OS
 .DS_Store

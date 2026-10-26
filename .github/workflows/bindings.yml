@@ -1,0 +1,68 @@
+name: Native library and language bindings
+
+on:
+  push:
+    branches: [main, feature/monkeydb-roadmap]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  bindings:
+    runs-on: ubuntu-24.04
+    env:
+      LD_LIBRARY_PATH: ${{ github.workspace }}/build
+      MONKEYDB_LIBRARY: ${{ github.workspace }}/build/libmonkeydb.so
+      MONKEYDB_LIB_DIR: ${{ github.workspace }}/build
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache: false
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Build native library
+        run: |
+          mkdir -p build
+          g++ -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -fPIC -shared -o build/libmonkeydb.so MonkeyCollection.cpp MonkeyDB_C.cpp
+          g++ -std=c++17 -Wall -Wextra -pedantic -pthread -o build/example main.cpp MonkeyDB.cpp MonkeyCollection.cpp
+          mkdir -p /tmp/monkeydb-example-run
+          (cd /tmp/monkeydb-example-run && "$GITHUB_WORKSPACE/build/example")
+          gcc -std=c11 -I. -x c -c -o /tmp/monkeydb-c-header.o - <<'C'
+          #include "MonkeyDB_C.h"
+          int main(void) { return 0; }
+          C
+      - name: Test Python binding
+        env:
+          PYTHONPATH: bindings/python
+        run: python -m unittest discover -s bindings/python -p 'test_*.py' -v
+      - name: Test Node.js binding
+        working-directory: bindings/node
+        run: |
+          npm ci
+          npm test
+      - name: Test Go binding
+        working-directory: bindings/go
+        run: go test -v ./...
+      - name: Test Rust binding
+        run: cargo test --manifest-path bindings/rust/Cargo.toml
+      - name: Test Java binding
+        run: mvn -B -f bindings/java/pom.xml test
+      - name: Test .NET binding
+        run: dotnet run --project bindings/csharp-smoke/Smoke.csproj --configuration Release
