@@ -47,7 +47,7 @@ public sealed class Collection : IDisposable
     }
     public JsonDocument? FindById(string id)
     {
-        string json = TakeString(monkeydb_find_by_id_json(_handle, id));
+        string? json = TakeString(monkeydb_find_by_id_json(_handle, id));
         if (json == null) { string error = LastError(); if (error.Length != 0) throw new InvalidOperationException(error); return null; }
         return JsonDocument.Parse(json);
     }
